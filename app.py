@@ -1,6 +1,7 @@
 import html
 import httpx
 import json
+import logging
 import os
 import re
 from datetime import datetime, timedelta, timezone
@@ -26,6 +27,9 @@ API_ERROR_MESSAGE = "Couldn’t read the page (API error). Try again. Nothing wa
 TIMEOUT_ERROR_MESSAGE = (
     "Gemini did not respond within 60 seconds. Retry the decode. Nothing was guessed."
 )
+CHECKLIST_ERROR_MESSAGE = "Couldn’t read the checklist reliably. Try again."
+LOGGER = logging.getLogger(__name__)
+LOGGER.setLevel(logging.INFO)
 
 ELIGIBILITY_RESPONSE_FORMAT = {
     "type": "text",
@@ -161,12 +165,28 @@ Never omit an extracted item just because it does not exactly match a page quote
         raise ValueError("Invalid eligibility verdict")
     if not isinstance(required_items, list) or not isinstance(optional_items, list):
         raise ValueError("Invalid submission item lists")
+    LOGGER.info(
+        "Checklist model counts before verification: required=%d optional=%d",
+        len(required_items),
+        len(optional_items),
+    )
     required_items = [item.strip() for item in required_items if isinstance(item, str) and item.strip()]
     optional_items = [item.strip() for item in optional_items if isinstance(item, str) and item.strip()]
-    required_items, optional_items = reconcile_submission_items(
+    required_items, optional_items, submission_section_found = reconcile_submission_items(
         required_items,
         optional_items,
         page_text,
+    )
+    verified_count = sum(
+        item["verified"] for item in required_items + optional_items
+    )
+    unverified_count = len(required_items) + len(optional_items) - verified_count
+    LOGGER.info(
+        "Checklist counts after verification: required=%d optional=%d verified=%d unverified=%d",
+        len(required_items),
+        len(optional_items),
+        verified_count,
+        unverified_count,
     )
 
     if not quote or quote not in page_text:
@@ -178,6 +198,7 @@ Never omit an extracted item just because it does not exactly match a page quote
             "raw_deadline": raw_deadline,
             "required": required_items,
             "optional": optional_items,
+            "submission_section_found": submission_section_found,
             "evidence_note": (
                 "No exact eligibility quote could be verified in the pasted page, "
                 "so no Yes/No decision was made."
@@ -196,6 +217,7 @@ Never omit an extracted item just because it does not exactly match a page quote
         "raw_deadline": raw_deadline,
         "required": required_items,
         "optional": optional_items,
+        "submission_section_found": submission_section_found,
         "evidence_note": "",
     }
 
@@ -268,15 +290,29 @@ def parse_deadline_datetime(date_text: str) -> datetime | None:
         return None
 
 
-SUBMISSION_HEADING_PATTERN = re.compile(r"^what\s+to\s+submit\b", re.IGNORECASE)
+SUBMISSION_HEADING_PATTERN = re.compile(
+    r"^(?:what\s+to\s+submit|what\s+you\s+must\s+submit|submission\s+requirements|requirements)\s*:??$",
+    re.IGNORECASE,
+)
 SUBMISSION_BULLET_PATTERN = re.compile(r"^\s*(?:[-*+•‣▪◦]|\d+[.)])\s+(.+?)\s*$")
 OPTIONAL_CUE_PATTERN = re.compile(r"\boptional\b|\bto\s+be\s+considered\s+for\b", re.IGNORECASE)
 REQUIRED_CUE_PATTERN = re.compile(r"\brequired\b|\bmust\s+submit\b", re.IGNORECASE)
 
 
 def is_submission_section_heading(line: str) -> bool:
-    heading_text = re.sub(r"^\s*#{1,6}\s*", "", line).strip().rstrip(":").strip()
-    return bool(SUBMISSION_HEADING_PATTERN.match(heading_text))
+    heading_text = re.sub(r"^\s*#{1,6}\s*", "", line).strip().rstrip(":.").strip()
+    if SUBMISSION_HEADING_PATTERN.fullmatch(heading_text):
+        return True
+
+    inline_heading = re.search(
+        r"(?:what\s+to\s+submit|what\s+you\s+must\s+submit|submission\s+requirements|requirements)\s*$",
+        heading_text,
+        re.IGNORECASE,
+    )
+    if inline_heading is None:
+        return False
+    prefix = heading_text[:inline_heading.start()].rstrip()
+    return not prefix or prefix.endswith((".", ":", "!", "?"))
 
 
 def is_next_section_heading(line: str) -> bool:
@@ -324,6 +360,10 @@ def extract_submission_bullets(page_text: str) -> tuple[list[str], list[str]]:
     return required_items, optional_items
 
 
+def has_submission_section(page_text: str) -> bool:
+    return any(is_submission_section_heading(line.strip()) for line in page_text.splitlines())
+
+
 def normalize_submission_item(item: str) -> str:
     return re.sub(r"[^\w]+", " ", item.casefold()).strip()
 
@@ -332,22 +372,29 @@ def reconcile_submission_items(
     model_required: list[str],
     model_optional: list[str],
     page_text: str,
-) -> tuple[list[str], list[str]]:
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], bool]:
     source_required, source_optional = extract_submission_bullets(page_text)
+    submission_section_found = has_submission_section(page_text)
     optional_keys = {normalize_submission_item(item) for item in source_optional}
-    required_items: list[str] = []
-    optional_items: list[str] = []
+    normalized_page = normalize_submission_item(page_text)
+    required_items: list[dict[str, Any]] = []
+    optional_items: list[dict[str, Any]] = []
     required_keys: set[str] = set()
     optional_item_keys: set[str] = set()
 
-    def add_item(item: str, optional: bool) -> None:
+    def add_item(item: str, optional: bool, verified: bool) -> None:
         item_key = normalize_submission_item(item)
         if not item_key:
             return
         target_items = optional_items if optional else required_items
         target_keys = optional_item_keys if optional else required_keys
-        if item_key not in target_keys:
-            target_items.append(item)
+        if item_key in target_keys:
+            for existing_item in target_items:
+                if normalize_submission_item(existing_item["text"]) == item_key:
+                    existing_item["verified"] = existing_item["verified"] or verified
+                    break
+        else:
+            target_items.append({"text": item, "verified": verified})
             target_keys.add(item_key)
 
     for item in model_required:
@@ -355,21 +402,21 @@ def reconcile_submission_items(
         is_optional = bool(OPTIONAL_CUE_PATTERN.search(item)) or any(
             key and (key in item_key or item_key in key) for key in optional_keys
         )
-        add_item(item, is_optional)
+        add_item(item, is_optional, item_key in normalized_page)
     for item in model_optional:
-        add_item(item, True)
+        add_item(item, True, normalize_submission_item(item) in normalized_page)
     for item in source_required:
-        add_item(item, False)
+        add_item(item, False, True)
     for item in source_optional:
-        add_item(item, True)
+        add_item(item, True, True)
 
-    optional_keys = {normalize_submission_item(item) for item in optional_items}
+    optional_keys = {normalize_submission_item(item["text"]) for item in optional_items}
     required_items = [
         item
         for item in required_items
-        if normalize_submission_item(item) not in optional_keys
+        if normalize_submission_item(item["text"]) not in optional_keys
     ]
-    return required_items, optional_items
+    return required_items, optional_items, submission_section_found
 
 
 def decode_deadline(raw_deadline: str, page_text: str) -> dict[str, Any]:
@@ -404,16 +451,23 @@ def decode_deadline(raw_deadline: str, page_text: str) -> dict[str, Any]:
     }
 
 
-def render_submission_group(label: str, items: list[str], optional: bool = False) -> None:
+def render_submission_group(
+    label: str,
+    items: list[dict[str, Any]],
+    submission_section_found: bool,
+    optional: bool = False,
+) -> None:
     st.markdown(f"**{label}**")
     if not items:
-        st.caption(f"No {label.lower()} submission items found on this page.")
+        if not submission_section_found:
+            st.caption(f"No {label.lower()} submission items found on this page.")
         return
 
     item_class = "submission-item optional-item" if optional else "submission-item"
     rendered_items = "".join(
         f'<div class="{item_class}"><span aria-hidden="true">&#9744;</span>'
-        f"<span>{html.escape(item)}</span></div>"
+        f"<span>{html.escape(item['text'])}</span>"
+        f"<small class=\"verification-note\">{'verified' if item['verified'] else 'not verified'}</small></div>"
         for item in items
     )
     st.markdown(rendered_items, unsafe_allow_html=True)
@@ -451,6 +505,7 @@ st.markdown(
     .submission-item { display: flex; gap: .65rem; margin: .45rem 0; }
     .optional-item { color: #77796f; }
     .optional-item span:first-child { opacity: .65; }
+    .verification-note { margin-left: auto; color: #77796f; font-size: .75rem; }
     </style>
     """,
     unsafe_allow_html=True,
@@ -465,7 +520,8 @@ if st.session_state.get("retry_available", False):
     retry_clicked = st.button("Retry decode")
 
 decode_clicked = st.button("Decode", type="primary")
-if decode_clicked or retry_clicked:
+checklist_retry_clicked = st.session_state.pop("checklist_retry_clicked", False)
+if decode_clicked or retry_clicked or checklist_retry_clicked:
     st.session_state["retry_available"] = False
     st.session_state.pop("decode_result", None)
     if not looks_like_hackathon_page(page_text):
@@ -507,5 +563,22 @@ if "decode_result" in st.session_state:
 
     with st.container(border=True):
         st.subheader("What you must submit")
-        render_submission_group("Required", result["required"])
-        render_submission_group("Optional", result["optional"], optional=True)
+        if result["submission_section_found"] and not (
+            result["required"] or result["optional"]
+        ):
+            st.error(CHECKLIST_ERROR_MESSAGE)
+            if st.button("Retry decode", key="retry_checklist"):
+                st.session_state["checklist_retry_clicked"] = True
+                st.rerun()
+        else:
+            render_submission_group(
+                "Required",
+                result["required"],
+                result["submission_section_found"],
+            )
+            render_submission_group(
+                "Optional",
+                result["optional"],
+                result["submission_section_found"],
+                optional=True,
+            )
