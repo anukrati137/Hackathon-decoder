@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hackathon Decoder | App Map</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f7f4ed;
+      --surface: #fffefa;
+      --ink: #242720;
+      --muted: #62665f;
+      --line: #c8c5bc;
+      --green: #26734d;
+      --amber: #9a6813;
+      --blue: #315b73;
+    }
+    * { box-sizing: border-box; }
+    body {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 3rem;
+      background: var(--paper);
+      color: var(--ink);
+      font: 1rem/1.6 "Segoe UI", sans-serif;
+    }
+    h1, h2, h3 { line-height: 1.2; }
+    h1 { margin: 0 0 .5rem; font-size: 2rem; }
+    h2 { margin: 2rem 0 .75rem; font-size: 1.35rem; }
+    h3 { margin: 0 0 .35rem; font-size: 1rem; }
+    p { margin: .4rem 0 .8rem; }
+    a { color: #245c78; text-underline-offset: .15em; }
+    code, pre { font-family: Consolas, monospace; }
+    code { overflow-wrap: anywhere; }
+    .lede, .muted { color: var(--muted); }
+    .flow {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: .6rem;
+      align-items: stretch;
+      margin: 1rem 0;
+    }
+    .node {
+      min-width: 0;
+      padding: .8rem;
+      border: 1px solid var(--line);
+      background: var(--surface);
+    }
+    .node strong { display: block; margin-bottom: .3rem; }
+    .arrow { align-self: center; justify-self: center; color: var(--blue); font-size: 1.25rem; }
+    .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .75rem; }
+    .step { border-top: 3px solid var(--blue); padding: .75rem .8rem; background: var(--surface); }
+    .step-number { color: var(--blue); font-weight: 700; }
+    .tag { display: inline-block; padding: .08rem .4rem; border: 1px solid var(--line); color: var(--muted); font-size: .85rem; }
+    .verified { color: var(--green); }
+    .unverified { color: var(--amber); }
+    details { margin: .6rem 0; padding: .65rem .8rem; border: 1px solid var(--line); background: var(--surface); }
+    summary { cursor: pointer; font-weight: 650; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+    @media (max-width: 680px) {
+      body { padding: 1.25rem .9rem 2rem; }
+      .flow { grid-template-columns: 1fr; }
+      .arrow { transform: rotate(90deg); }
+      .steps { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <p class="tag">Local app · no saved pages</p>
+    <h1>Hackathon Decoder</h1>
+    <p class="lede">Paste one event page to see an evidence-backed eligibility result, an IST deadline when it can be safely converted, and the page's Required and Optional submission items.</p>
+  </header>
+
+  <main>
+    <section aria-labelledby="journey-title">
+      <h2 id="journey-title">One decode, from paste to result</h2>
+      <div class="flow" role="img" aria-label="Paste and About me go through validation, Gemini extraction, and Python reconciliation before the three result sections render.">
+        <div class="node"><strong>1. Input</strong><a href="../app.py">Paste box and About me</a></div>
+        <div class="arrow" aria-hidden="true">→</div>
+        <div class="node"><strong>2. Extract</strong><a href="../app.py">extract_hackathon_details</a><br>Gemini returns source text and lists.</div>
+        <div class="arrow" aria-hidden="true">→</div>
+        <div class="node"><strong>3. Reconcile</strong><a href="../app.py">reconcile_submission_items</a> and <a href="../app.py">decode_deadline</a></div>
+      </div>
+      <div class="flow" aria-hidden="true">
+        <div class="node"><strong>Visible result</strong>Can I enter?</div>
+        <div class="arrow">→</div>
+        <div class="node"><strong>Visible result</strong>Your deadline in IST or an honest fallback</div>
+        <div class="arrow">→</div>
+        <div class="node"><strong>Visible result</strong>Required, then Optional</div>
+      </div>
+      <p class="muted">The API key is loaded locally from <code>.env</code>; it is not shown in the page. Paste text and results live only in the current Streamlit session.</p>
+    </section>
+
+    <section aria-labelledby="route-title">
+      <h2 id="route-title">Reference route through the code</h2>
+      <div class="steps">
+        <article class="step">
+          <span class="step-number">Stop 1</span>
+          <h3><a href="../app.py">looks_like_hackathon_page</a></h3>
+          <p>Checks whether the paste has enough hackathon context to send for decoding. Bad input gets the friendly message before any API request.</p>
+        </article>
+        <article class="step">
+          <span class="step-number">Stop 2</span>
+          <h3><a href="../app.py">extract_hackathon_details</a></h3>
+          <p>Sends the page and About me to Gemini. The returned deadline stays raw; checklist items are reconciled with source bullets. Items not found in the source remain visible as <span class="unverified">not verified</span>.</p>
+        </article>
+        <article class="step">
+          <span class="step-number">Stop 3</span>
+          <h3><a href="../app.py">decode_deadline</a> and render section</h3>
+          <p>Python maps only supported timezone labels, converts safe dates to IST, and renders the three results. An unclear deadline does not hide eligibility or submission items.</p>
+        </article>
+      </div>
+      <p class="muted">This is a reference route through the committed source, not a record that the route was navigated live. Source commit: <code>c93f0a1</code>.</p>
+    </section>
+
+    <section aria-labelledby="change-title">
+      <h2 id="change-title">To change this, start here</h2>
+      <details>
+        <summary>Change what counts as a hackathon page</summary>
+        <p>Start at <a href="../app.py">looks_like_hackathon_page</a> and keep its rejection message aligned with the paste rules in the PRD.</p>
+      </details>
+      <details>
+        <summary>Change timezone labels or date formats</summary>
+        <p>Start at <a href="../app.py">FIXED_TIMEZONE_OFFSETS</a>, <a href="../app.py">TIMEZONE_SUFFIX_PATTERN</a>, and <a href="../app.py">DATE_TIME_FORMATS</a>. Unsupported or ambiguous labels should keep the quoted fallback.</p>
+      </details>
+      <details>
+        <summary>Change submission grouping or verification labels</summary>
+        <p>Start at <a href="../app.py">extract_submission_bullets</a> and <a href="../app.py">reconcile_submission_items</a>. Source bullets are preserved; Optional cues include “To be considered for” and “optional”.</p>
+      </details>
+      <details>
+        <summary>Change the model or install requirements</summary>
+        <p>Start at <a href="../.env.example">.env.example</a> for the model setting and <a href="../requirements.txt">requirements.txt</a> for packages. Keep real credentials in the ignored local <code>.env</code>.</p>
+      </details>
+    </section>
+
+    <section aria-labelledby="practice-title">
+      <h2 id="practice-title">A practice to reuse</h2>
+      <p>The saved AWS page exposed a mismatch between a model-generated checklist and the source bullets. The code now logs counts before and after reconciliation, preserves unmatched items as not verified, and offers retry when a submission section yields no items. On another project, compare extracted or generated results against the source and make missing or uncertain data visible instead of silently dropping it.</p>
+    </section>
+
+    <section aria-labelledby="run-title">
+      <h2 id="run-title">Run it again</h2>
+      <ol>
+        <li>Set your own <code>GEMINI_API_KEY</code> in the local <code>.env</code>.</li>
+        <li>Install dependencies with <code>python -m pip install -r requirements.txt</code>.</li>
+        <li>Run <code>streamlit run app.py</code> and open the local URL printed in the terminal.</li>
+      </ol>
+      <p class="muted">This map is a static snapshot of source commit <code>c93f0a1</code>; update it if the app changes later. It works offline and uses no scripts or external assets.</p>
+    </section>
+  </main>
+</body>
+</html>

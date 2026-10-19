@@ -9,7 +9,7 @@ Build mode: learn
 
 ## Slices
 
-- [ ] **1. Decode eligibility with page evidence**
+- [x] **1. Decode eligibility with page evidence**
   Becomes usable: A local Streamlit app accepts one hackathon page and optional About me text, then shows a Yes, No, or Unsure verdict with an exact supporting quote. Unusable input, missing keys, and API failures do not produce guessed results.
   Why now: Bootstrap is part of the first working behavior, and this proves the unique kernel while verifying the unfamiliar Gemini API and model choice early.
   PRD ref: `prd.md > The Core Journey` (steps 1-5), `prd.md > Paste and About me`, `prd.md > Decode`, `prd.md > Can I enter?`, `prd.md > States and Boundaries`
@@ -19,7 +19,7 @@ Build mode: learn
   Learner check: Open the local app, paste the AWS hackathon page (or another real page), enter `college student, India`, and Decode. Check whether the verdict and quoted evidence match what the page says.
   Commit: `Build eligibility evidence decoder`
 
-- [ ] **2. Decode deadline and submission requirements**
+- [x] **2. Decode deadline and submission requirements**
   Becomes usable: The same screen returns all three cards: eligibility, deadline in IST with days left or the honest quoted fallback, and Required/Optional submission checklists in the right order.
   Why now: This extends the proven extraction flow while keeping date conversion in Python and making unsupported timezone labels fail honestly.
   PRD ref: `prd.md > Your deadline`, `prd.md > What you must submit`, `prd.md > Retry`, `prd.md > Look and Feel`, `prd.md > States and Boundaries`
@@ -31,23 +31,23 @@ Build mode: learn
 
 ## Hands-on Checkpoints
 
-- [ ] Early usable behavior explored — after slice 1, inspect the eligibility verdict and its quoted evidence; feedback can shape the remaining decode behavior.
-- [ ] Final kick-the-tires exploration and feedback completed
+- [x] Early usable behavior explored — AWS page returned No with the “Professionals/Post grads only” quote; Build With AI returned Unsure at age 21 and No at age 16.
+- [x] Final kick-the-tires exploration and feedback completed — unusable input, refresh behavior, readability, and the full AWS Required/Optional lists pass (learner report, 2026-10-20).
 
 ## Final Review
 
-- [ ] Final review complete — feedback resolved and learner confirms ready to ship
+- [x] Final review complete — feedback resolved; learner reports the final checks pass and requests completion.
 
 ## Code Tour and App Map
 
-- [ ] Learning activity complete — guided route, focused alternative, prior practice connected, or brief recap
-- [ ] Optional edit and transfer reflection addressed — offered/declined/already covered/not applicable as appropriate
-- [ ] `devpost/app-map.html` generated from finished code, checked, and shown, including a project-grounded practice to reuse
+- [x] Learning activity complete — brief guided route connected the paste, extraction/reconciliation, and result rendering to the tested AWS behavior.
+- [x] Optional edit and transfer reflection addressed — a harmless title-label edit and one transfer question are offered in the handoff.
+- [x] `devpost/app-map.html` generated from finished code, checked, and shown, including a project-grounded practice to reuse
 
-Activity and evidence: Not started.
-Route and stops: Not started.
-Edit outcome: Not started.
-Reflection: Not started.
-Activity mode: Not started.
+Activity and evidence: Short guided walkthrough delivered using the learner's tested AWS example. Verification evidence includes the reported age/deadline/checklist behavior, app compile checks, checklist AppTests, and a successful local health check. No claim of mastery is made.
+Route and stops: `app.py > looks_like_hackathon_page` checks the paste; `app.py > extract_hackathon_details` and `reconcile_submission_items` request and reconcile source data; `app.py > decode_deadline` and the final render block convert and display results. The map labels this as a reference route.
+Edit outcome: No optional code edit applied; harmless title-label edit offered for independent exploration.
+Reflection: Optional transfer question offered in the handoff; no response recorded.
+Activity mode: Guided source walkthrough in chat; app map opened offline and visually checked, with relative file links verified.
 
 ## Revisions
