@@ -1,0 +1,8 @@
+# Personal learning context (kept out of commits by default)
+/devpost/learner-profile.md
+
+# Local secrets — keep a secret-free .env.example if you need one
+.env
+.env.*
+!.env.example
+

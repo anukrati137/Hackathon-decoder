@@ -1,0 +1,5 @@
+streamlit
+google-genai
+httpx
+python-dotenv
+tzdata
