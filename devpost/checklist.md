@@ -47,7 +47,7 @@ Build mode: learn
 Activity and evidence: Short guided walkthrough delivered using the learner's tested AWS example. Verification evidence includes the reported age/deadline/checklist behavior, app compile checks, checklist AppTests, and a successful local health check. No claim of mastery is made.
 Route and stops: `app.py > looks_like_hackathon_page` checks the paste; `app.py > extract_hackathon_details` and `reconcile_submission_items` request and reconcile source data; `app.py > decode_deadline` and the final render block convert and display results. The map labels this as a reference route.
 Edit outcome: No optional code edit applied; harmless title-label edit offered for independent exploration.
-Reflection: Optional transfer question offered in the handoff; no response recorded.
+Reflection: Transfer question answered; personal response recorded only in the ignored learner profile.
 Activity mode: Guided source walkthrough in chat; app map opened offline and visually checked, with relative file links verified.
 
 ## Revisions
